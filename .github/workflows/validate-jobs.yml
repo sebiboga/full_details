@@ -105,6 +105,6 @@ jobs:
           9. extract the salary. if there is just one salary displayed then extract this one from the page. This one is important to have salary.
           if there is "lei" transform it to "RON"
           
-          10. limit to 50 job
+          10. limit to 5 jobs
           Output the final result (number of jobs validated).
           "
