@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       limit:
-        description: 'Number of jobs to validate'
+        description: 'Number of jobs to validate per run'
         required: false
         default: '1'
         type: string
@@ -84,8 +84,8 @@ jobs:
 
           Follow the workflow in AGENTS.md and instructions.md to validate jobs:
           
-          1. First query SOLR for a job with status='scraped' (not yet verified):
-             curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" 'https://solr.peviitor.ro/solr/job/select?q=status:scraped&wt=json&rows=1'
+          1. First query SOLR for a job with status NOT verified:
+             curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" 'https://solr.peviitor.ro/solr/job/select?q=-status:verified&wt=json&rows=1'
           
           2. Open the job URL from SOLR in Chrome using chrome-devtools
           
