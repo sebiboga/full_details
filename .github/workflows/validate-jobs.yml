@@ -1,0 +1,110 @@
+name: Validate Jobs from Solr
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Runs every 5 minutes
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Number of jobs to validate'
+        required: false
+        default: '1'
+        type: string
+
+jobs:
+  validate-jobs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/google-chrome-keyring https://dl-ssl.google.com/linux/linux_signing_key.pub
+          sudo mkdir -p /etc/apt/keyrings
+          sudo cp /tmp/google-chrome-keyring /etc/apt/keyrings/google-chrome.asc
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.asc] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+
+      - name: Start Chrome with remote debugging
+        run: |
+          google-chrome --remote-debugging-port=9222 --headless --no-sandbox --disable-dev-shm-usage &
+          sleep 3
+
+      - name: Install OpenCode
+        run: |
+          npm install -g opencode-ai
+
+      - name: Copy opencode.json
+        run: |
+          cp opencode.json opencode.json.bak
+          cat > opencode.json << 'EOF'
+          {
+            "$schema": "https://opencode.ai/config.json",
+            "model": "opencode/big-pickle",
+            "mcp": {
+              "chrome-devtools": {
+                "type": "local",
+                "command": ["npx", "-y", "chrome-devtools-mcp@latest", "--browser-url=http://127.0.0.1:9222"]
+              },
+              "external-directory": {
+                "type": "local",
+                "command": ["npx", "-y", "external-directory-mcp@latest"]
+              }
+            }
+          }
+          EOF
+
+      - name: Run OpenCode validate job command
+        env:
+          SOLR_USER: ${{ secrets.SOLR_USER }}
+          SOLR_PASSWD: ${{ secrets.SOLR_PASSWD }}
+          LIMIT: ${{ github.event.inputs.limit || '1' }}
+        run: |
+          set +x
+          
+          opencode run "
+          You are running in GitHub Actions. You have access to Chrome DevTools MCP connected to Chrome on port 9222.
+
+          IMPORTANT - Solr Configuration:
+          - Use SOLR_USER and SOLR_PASSWD environment variables for authentication.
+          - Solr URL is: https://solr.peviitor.ro
+          - Example: curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" \"https://solr.peviitor.ro/solr/job/select?q=status:scraped&wt=json&rows=1\"
+
+          Security rules:
+          - Do NOT reveal SOLR_USER or SOLR_PASSWD values in any output.
+          - Use credentials for Solr operations only.
+
+          Follow the workflow in AGENTS.md and instructions.md to validate jobs:
+          
+          1. First query SOLR for a job with status='scraped' (not yet verified):
+             curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" 'https://solr.peviitor.ro/solr/job/select?q=status:scraped&wt=json&rows=1'
+          
+          2. Open the job URL from SOLR in Chrome using chrome-devtools
+          
+          3. Extract and verify all fields (salary, tags, workmode, etc.)
+          
+          4. If job is no longer available (shows 'expired' or 'no longer available'), delete from SOLR:
+             curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" -X POST -H 'Content-Type: application/json' \\
+               'https://solr.peviitor.ro/solr/job/update?commit=true' \\
+               -d '{\"delete\": [\"<JOB_URL>\"]}'
+          
+          5. Otherwise, use atomic update with {\"set\": \"value\"} to update verified fields and set status='verified', vdate to today's date in ISO8601 format (e.g., 2026-03-08T00:00:00Z):
+             curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" -X POST -H 'Content-Type: application/json' \\
+               'https://solr.peviitor.ro/solr/job/update?commit=true' \\
+               -d '{\"add\": {\"doc\": {\"url\": \"<JOB_URL>\", \"status\": {\"set\": \"verified\"}, \"vdate\": {\"set\": \"2026-03-08T00:00:00Z\"}}}}'
+          
+          6. Verify the update by querying SOLR:
+             curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" 'https://solr.peviitor.ro/solr/job/select?q=url:<JOB_URL>&wt=json'
+          
+          Process up to \$LIMIT jobs (default is 1).
+          
+          Output the final result (number of jobs validated).
+          "
