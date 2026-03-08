@@ -4,12 +4,7 @@ on:
   schedule:
     - cron: '*/5 * * * *'  # Runs every 5 minutes
   workflow_dispatch:
-    inputs:
-      limit:
-        description: 'Number of jobs to validate per run'
-        required: false
-        default: '1'
-        type: string
+
 
 jobs:
   validate-jobs:
@@ -104,7 +99,8 @@ jobs:
           6. Verify the update by querying SOLR:
              curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" 'https://solr.peviitor.ro/solr/job/select?q=url:<JOB_URL>&wt=json'
           
-          Process up to \$LIMIT jobs (default is 1).
+          7. for tags we are interested if job is entry level or mid or senior. we also need to extract required skills, industry.
+          tags are one of the most IMPORTANT part why we open the page in Chrome. so extract up to 10 most important tags.
           
           Output the final result (number of jobs validated).
           "
