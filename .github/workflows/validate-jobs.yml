@@ -84,7 +84,7 @@ jobs:
           
           2. Open the job URL from SOLR in Chrome using chrome-devtools
           
-          3. Extract and verify all fields (salary, tags, workmode, etc.)
+          3. Extract and verify all fields (salary, tags, workmode, etc.). follow instructions from instructions.md and AGENTS.md file from this repository.
           
           4. If job is no longer available (shows 'expired' or 'no longer available'), delete from SOLR:
              curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" -X POST -H 'Content-Type: application/json' \\
