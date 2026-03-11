@@ -77,14 +77,14 @@ jobs:
           - Do NOT reveal SOLR_USER or SOLR_PASSWD values in any output.
           - Use credentials for Solr operations only.
 
-          Follow the workflow in AGENTS.md and instructions.md to validate jobs:
+          Follow the workflow in AGENTS.md and INSTRUCTIONS.md to validate jobs:
           
           1. First query SOLR for a job with status NOT verified:
              curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" 'https://solr.peviitor.ro/solr/job/select?q=-status:verified&wt=json&rows=1'
           
           2. Open the job URL from SOLR in Chrome using chrome-devtools
           
-          3. Extract and verify all fields (salary, tags, workmode, etc.). follow instructions from instructions.md and AGENTS.md file from this repository.
+          3. Extract and verify all fields (salary, tags, workmode, etc.). follow instructions from INSTRUCTIONS.md and AGENTS.md file from this repository.
           
           4. If job is no longer available (shows 'expired' or 'no longer available'), delete from SOLR:
              curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" -X POST -H 'Content-Type: application/json' \\

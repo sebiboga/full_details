@@ -3,13 +3,13 @@
 When working with this project, follow these steps:
 
 ## 1. Read Documentation First
-- Start by reading `instructions.md` in this directory to understand the project context
+- Start by reading `INSTRUCTIONS.md` in this directory to understand the project context
 - Check for any existing documentation before making assumptions
 
 ## 2. Job & Company Models
 To understand the data models:
 1. Fetch from GitHub: `https://github.com/peviitor-ro/peviitor_core/blob/main/README.md`
-2. Or use the cached info in `instructions.md`
+2. Or use the cached info in `INSTRUCTIONS.md`
 
 ## 3. Accessing Solr Schemas
 When asked to read Solr schemas:

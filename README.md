@@ -8,11 +8,14 @@ This project validates jobs from Solr by checking if the job URLs are still avai
 .
 ├── .github/
 │   └── workflows/
-│       └── validate-jobs.yml    # GitHub Actions workflow
-├── agents.md                     # Agent instructions
-├── instructions.md               # Detailed instructions
-├── opencode.json                 # OpenCode configuration
-├── start-chrome.ps1              # Chrome startup script (Windows)
+│       ├── validate-jobs.yml      # Main validation workflow
+│       └── test-page-1.yml        # Test page 1 workflow
+├── AGENTS.md                      # Agent instructions
+├── INSTRUCTIONS.md                # Detailed instructions
+├── OLX.md                         # OLX API documentation
+├── opencode.json                  # OpenCode configuration
+├── start-chrome.ps1               # Chrome startup script (Windows)
+├── .gitignore
 └── README.md
 ```
 
@@ -51,4 +54,4 @@ Set the following secrets in your GitHub repository:
 
 2. Configure OpenCode with your credentials in environment variables
 
-3. Follow the workflow in `instructions.md` and `agents.md`
+3. Follow the workflow in `INSTRUCTIONS.md` and `AGENTS.md`
