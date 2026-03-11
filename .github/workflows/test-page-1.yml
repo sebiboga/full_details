@@ -1,6 +1,8 @@
 name: Test Page 1 Validation
 
 on:
+  schedule:
+    - cron: '0 * * * *'  # Runs every hour
   workflow_dispatch:
     inputs:
       page:
