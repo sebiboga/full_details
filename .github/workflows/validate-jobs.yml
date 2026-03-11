@@ -91,12 +91,14 @@ jobs:
                 'https://solr.peviitor.ro/solr/job/update?commit=true' \\
                 -d '{\"delete\": [\"<JOB_URL>\"]}'
            
-           5. If job is valid (real job) BUT couldn't extract full details (blocked by CAPTCHA, page didn't load properly, missing salary/tags/workmode), set status='tested':
+           5. If job is valid BUT couldn't extract FULL details (blocked by CAPTCHA, page didn't load, missing salary/tags/workmode) - URL works but job is incomplete:
+              Set status='tested' (URL tested, job exists but not fully scraped)
               curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" -X POST -H 'Content-Type: application/json' \\
                 'https://solr.peviitor.ro/solr/job/update?commit=true' \\
                 -d '{\"add\": {\"doc\": {\"url\": \"<JOB_URL>\", \"status\": {\"set\": \"tested\"}, \"vdate\": {\"set\": \"2026-03-08T00:00:00Z\"}}}}'
            
-           6. If job is valid AND all details extracted (salary, tags, workmode), set status='verified':
+           6. If job is valid AND FULLY SCRAPED with all details (company, cif, salary, tags, workmode):
+              Set status='verified' (fully scraped with all required details)
               curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" -X POST -H 'Content-Type: application/json' \\
                 'https://solr.peviitor.ro/solr/job/update?commit=true' \\
                 -d '{\"add\": {\"doc\": {\"url\": \"<JOB_URL>\", \"status\": {\"set\": \"verified\"}, \"vdate\": {\"set\": \"2026-03-08T00:00:00Z\"}}}}'
