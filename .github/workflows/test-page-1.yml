@@ -88,19 +88,21 @@ jobs:
            
           2. This returns up to 12 jobs. Process ALL of them (limit to 12 jobs max).
           
-          3. For each job URL:
-             a) Open the job URL in Chrome using chrome-devtools
-             b) Determine if it's a REAL JOB or NOT:
-                - NOT a job (delete): Employee testimonials, company pages, 'what does X do' articles, job no longer available/expired
-                - REAL JOB: Has job title, responsibilities, requirements, apply button
-             
-             c) For REAL jobs:
-                - Extract: company, cif (search web for 'COMPANY CIF Romania'), salary (convert lei to RON), workmode (remote/hybrid/on-site), tags (max 10: experience level, skills, industry)
-                - Update in Solr with atomic update: status='verified', vdate to today's date
-                - Update company in company core if new
-             
-             d) For NOT jobs:
-                - Delete from Solr
+           3. For each job URL:
+              a) Open the job URL in Chrome using chrome-devtools
+              b) Determine if it's a REAL JOB or NOT:
+                 - NOT a job (delete): Employee testimonials, company pages, 'what does X do' articles, job no longer available/expired, CAPTCHA blocked
+                 - REAL JOB: Has job title, responsibilities, requirements, apply button
+              
+              c) For REAL jobs with full details extracted (company, cif, salary, tags, workmode):
+                 - Update in Solr with atomic update: status='verified', vdate to today's date
+                 - Update company in company core if new
+              
+              d) For REAL jobs but couldn't extract full details (CAPTCHA, blocked, missing data):
+                 - Update in Solr: status='tested', vdate to today's date
+              
+              e) For NOT jobs:
+                 - Delete from Solr
            
           4. For OLX jobs, use OLX API instead of Chrome:
              - List: curl -s \"https://www.olx.ro/api/v1/offers/?offset=0&limit=50&category_id=4&currency=RON\"

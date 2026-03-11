@@ -79,22 +79,27 @@ jobs:
 
           Follow the workflow in AGENTS.md and INSTRUCTIONS.md to validate jobs:
           
-          1. First query SOLR for a job with status NOT verified:
-             curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" 'https://solr.peviitor.ro/solr/job/select?q=-status:verified&wt=json&rows=1'
+          1. First query SOLR for a job with status NOT verified and NOT tested:
+             curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" 'https://solr.peviitor.ro/solr/job/select?q=-status:verified+-status:tested&wt=json&rows=1'
           
           2. Open the job URL from SOLR in Chrome using chrome-devtools
           
           3. Extract and verify all fields (salary, tags, workmode, etc.). follow instructions from INSTRUCTIONS.md and AGENTS.md file from this repository.
-          
-          4. If job is no longer available (shows 'expired' or 'no longer available'), delete from SOLR:
-             curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" -X POST -H 'Content-Type: application/json' \\
-               'https://solr.peviitor.ro/solr/job/update?commit=true' \\
-               -d '{\"delete\": [\"<JOB_URL>\"]}'
-          
-          5. Otherwise, use atomic update with {\"set\": \"value\"} to update verified fields and set status='verified', vdate to today's date in ISO8601 format (e.g., 2026-03-08T00:00:00Z):
-             curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" -X POST -H 'Content-Type: application/json' \\
-               'https://solr.peviitor.ro/solr/job/update?commit=true' \\
-               -d '{\"add\": {\"doc\": {\"url\": \"<JOB_URL>\", \"status\": {\"set\": \"verified\"}, \"vdate\": {\"set\": \"2026-03-08T00:00:00Z\"}}}}'
+           
+           4. If job is no longer available (shows 'expired' or 'no longer available' or CAPTCHA blocks access), delete from SOLR:
+              curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" -X POST -H 'Content-Type: application/json' \\
+                'https://solr.peviitor.ro/solr/job/update?commit=true' \\
+                -d '{\"delete\": [\"<JOB_URL>\"]}'
+           
+           5. If job is valid (real job) BUT couldn't extract full details (blocked by CAPTCHA, page didn't load properly, missing salary/tags/workmode), set status='tested':
+              curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" -X POST -H 'Content-Type: application/json' \\
+                'https://solr.peviitor.ro/solr/job/update?commit=true' \\
+                -d '{\"add\": {\"doc\": {\"url\": \"<JOB_URL>\", \"status\": {\"set\": \"tested\"}, \"vdate\": {\"set\": \"2026-03-08T00:00:00Z\"}}}}'
+           
+           6. If job is valid AND all details extracted (salary, tags, workmode), set status='verified':
+              curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" -X POST -H 'Content-Type: application/json' \\
+                'https://solr.peviitor.ro/solr/job/update?commit=true' \\
+                -d '{\"add\": {\"doc\": {\"url\": \"<JOB_URL>\", \"status\": {\"set\": \"verified\"}, \"vdate\": {\"set\": \"2026-03-08T00:00:00Z\"}}}}'
           
           6. Verify the update by querying SOLR:
              curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" 'https://solr.peviitor.ro/solr/job/select?q=url:<JOB_URL>&wt=json'
