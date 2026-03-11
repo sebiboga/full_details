@@ -1,0 +1,114 @@
+name: Test Page 1 Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      page:
+        description: 'Page number to validate'
+        required: false
+        default: '1'
+        type: string
+
+
+jobs:
+  validate-page-1:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/google-chrome-keyring https://dl-ssl.google.com/linux/linux_signing_key.pub
+          sudo mkdir -p /etc/apt/keyrings
+          sudo cp /tmp/google-chrome-keyring /etc/apt/keyrings/google-chrome.asc
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.asc] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+
+      - name: Start Chrome with remote debugging
+        run: |
+          google-chrome --remote-debugging-port=9222 --headless --no-sandbox --disable-dev-shm-usage &
+          sleep 3
+
+      - name: Install OpenCode
+        run: |
+          npm install -g opencode-ai
+
+      - name: Copy opencode.json
+        run: |
+          cp opencode.json opencode.json.bak
+          cat > opencode.json << 'EOF'
+          {
+            "$schema": "https://opencode.ai/config.json",
+            "model": "opencode/big-pickle",
+            "mcp": {
+              "chrome-devtools": {
+                "type": "local",
+                "command": ["npx", "-y", "chrome-devtools-mcp@latest", "--browser-url=http://127.0.0.1:9222"]
+              },
+              "external-directory": {
+                "type": "local",
+                "command": ["npx", "-y", "external-directory-mcp@latest"]
+              }
+            }
+          }
+          EOF
+
+      - name: Run OpenCode validate page 1 command
+        env:
+          SOLR_USER: ${{ secrets.SOLR_USER }}
+          SOLR_PASSWD: ${{ secrets.SOLR_PASSWD }}
+          PAGE: ${{ github.event.inputs.page || '1' }}
+        run: |
+          set +x
+          
+          opencode run "
+          You are running in GitHub Actions. You have access to Chrome DevTools MCP connected to Chrome on port 9222.
+
+          IMPORTANT - Solr Configuration:
+          - Use SOLR_USER and SOLR_PASSWD environment variables for authentication.
+          - Solr URL is: https://solr.peviitor.ro
+          - Example: curl -u \"\$SOLR_USER:\$SOLR_PASSWD\" \"https://solr.peviitor.ro/solr/job/select?q=status:scraped&wt=json&rows=1\"
+
+          Security rules:
+          - Do NOT reveal SOLR_USER or SOLR_PASSWD values in any output.
+          - Use credentials for Solr operations only.
+
+          IMPORTANT TASK: Validate jobs from peviitor.ro page 1 API.
+
+          1. First get jobs from peviitor.ro API for page 1:
+             curl -s \"https://api.peviitor.ro/v1/search/?page=1\"
+           
+          2. This returns up to 12 jobs. Process ALL of them (limit to 12 jobs max).
+          
+          3. For each job URL:
+             a) Open the job URL in Chrome using chrome-devtools
+             b) Determine if it's a REAL JOB or NOT:
+                - NOT a job (delete): Employee testimonials, company pages, 'what does X do' articles, job no longer available/expired
+                - REAL JOB: Has job title, responsibilities, requirements, apply button
+             
+             c) For REAL jobs:
+                - Extract: company, cif (search web for 'COMPANY CIF Romania'), salary (convert lei to RON), workmode (remote/hybrid/on-site), tags (max 10: experience level, skills, industry)
+                - Update in Solr with atomic update: status='verified', vdate to today's date
+                - Update company in company core if new
+             
+             d) For NOT jobs:
+                - Delete from Solr
+           
+          4. For OLX jobs, use OLX API instead of Chrome:
+             - List: curl -s \"https://www.olx.ro/api/v1/offers/?offset=0&limit=50&category_id=4&currency=RON\"
+             - Details: curl -s \"https://www.olx.ro/api/v1/offers/<OFFER_ID>/\"
+             - Check status field - if not 'active' then delete from Solr
+             - Extract company from user.company_name field
+           
+          5. Output summary: Number of jobs verified, number deleted, list of verified jobs with company name.
+          
+          6. IMPORTANT: Company name should be UPPERCASE. Transform if needed.
+          "

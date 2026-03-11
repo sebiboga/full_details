@@ -56,25 +56,52 @@ curl -u solr:SolrRocks "https://solr.peviitor.ro/solr/company/schema"
 | `lastScraped` | string | No | Last scrape date (ISO8601) |
 | `scraperFile` | string | No | Name of scraper file used |
 
-## Workflow: Verifying Jobs
+## Workflow: Verifying Jobs from peviitor.ro First Page
 
-### Step 1: Find Unverified Jobs in SOLR
-When starting a new verification session, query SOLR for jobs that are NOT verified:
+### Step 1: Get Jobs from peviitor.ro API
+Query the peviitor.ro API to get the first page of jobs:
 ```bash
-curl -u solr:SolrRocks "https://solr.peviitor.ro/solr/job/select?q=status:scraped&wt=json&rows=1"
+curl -s "https://api.peviitor.ro/v1/search/?page=1"
 ```
 
-### Step 2: Open Job URL
-Navigate to the job's URL from the SOLR response.
+### Step 2: Check Each Job URL
+For each job URL from the API:
+1. Open the URL in Chrome using Chrome DevTools
+2. Determine if it's a **real job** or **not a job** (testimonials, company pages, etc.)
+3. If NOT a real job (e.g., employee testimonials, company culture pages) → **DELETE from Solr**
+4. If real job → proceed to extract data
 
-### Step 3: Extract & Verify Data
-Follow the extraction process in AGENTS.md
+### Step 3: For Real Jobs - Extract & Verify Data
+Scrape the following from the job page:
+- **company**: Company name (from page)
+- **cif**: Company CIF/CUI (search web if not on page)
+- **salary**: Format "MIN-MAX RON" (convert "lei" to "RON")
+- **workmode**: "remote", "on-site", or "hybrid"
+- **tags**: Up to 10 tags - include:
+  - Experience level: entry-level, mid-level, senior-level
+  - Skills/industry
+  - Years of experience if mentioned
 
-### Step 4: Push Updates to SOLR
-Use **atomic update** to add verified fields. Status should be set to "verified".
+### Step 4: Find Company CIF
+If CIF not visible on page:
+1. Search web for "COMPANY NAME CIF Romania"
+2. Use sources like listafirme.eu, risco.ro, or firme.ro
+3. Also check if company already exists in Solr company core
 
-**Important**: Use atomic update with `{"set": "value"}` to preserve existing fields:
+### Step 5: Update Company Core (if new/needed)
+```bash
+curl -u solr:SolrRocks -X POST -H "Content-Type: application/json" \
+  "https://solr.peviitor.ro/solr/company/update?commit=true" \
+  -d "{\"add\": {\"doc\": {\"id\": \"<CIF>\", \
+  \"company\": {\"set\": \"<company_name>\"}, \
+  \"brand\": {\"set\": \"<brand_name>\"}, \
+  \"website\": {\"set\": [\"<website>\"]}, \
+  \"career\": {\"set\": [\"<career_page>\"]}, \
+  \"lastScraped\": {\"set\": \"2026-03-09T00:00:00Z\"}}}}"
+```
 
+### Step 6: Push Job Update to SOLR
+Use **atomic update** to add verified fields:
 ```bash
 curl -u solr:SolrRocks -X POST -H "Content-Type: application/json" \
   "https://solr.peviitor.ro/solr/job/update?commit=true" \
@@ -83,26 +110,27 @@ curl -u solr:SolrRocks -X POST -H "Content-Type: application/json" \
   \"cif\": {\"set\": \"<cif>\"}, \
   \"salary\": {\"set\": \"<salary>\"}, \
   \"workmode\": {\"set\": \"<workmode>\"}, \
-  \"tags\": {\"set\": [\"tag1\", \"tag2\"]}, \
+  \"tags\": {\"set\": [\"tag1\", \"tag2\", \"tag3\"]}, \
   \"status\": {\"set\": \"verified\"}, \
-  \"vdate\": {\"set\": \"2026-03-08T00:00:00Z\"}}}}"
+  \"vdate\": {\"set\": \"2026-03-09T00:00:00Z\"}}}}"
 ```
 
-### Step 5: Verify the Update in SOLR
+### Step 7: Verify the Update in SOLR
 Always query SOLR to confirm all fields were updated correctly:
 ```bash
 curl -u solr:SolrRocks "https://solr.peviitor.ro/solr/job/select?q=url:<JOB_URL>&wt=json"
 ```
 
-**Note**: Date fields (vdate, date, expirationdate) must use ISO8601 format: `YYYY-MM-DDTHH:MM:SSZ`
-
-### Step 6: Handle Expired Jobs
-If job is no longer available on the original URL:
+### Step 8: Handle Non-Job Pages
+If the URL is not a job description (testimonial, company page, etc.):
 ```bash
 curl -u solr:SolrRocks -X POST -H "Content-Type: application/json" \
   "https://solr.peviitor.ro/solr/job/update?commit=true" \
   -d "{\"delete\": [\"<JOB_URL>\"]}"
 ```
+
+## OLX Jobs
+See [OLX.md](./OLX.md) for how to verify and scrape OLX jobs using their official API.
 
 ## Notes
 - Use `curl` with `-u solr:SolrRocks` for authentication

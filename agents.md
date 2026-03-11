@@ -38,13 +38,70 @@ curl -u solr:SolrRocks "https://solr.peviitor.ro/solr/company/schema"
 - Solr credentials: `solr` / `SolrRocks`
 - Always use Basic Auth via curl `-u` flag
 
-## 6. Verification Workflow
-When asked to verify. First query SOL a job:
-1R for a job with status="scraped" (not yet verified)
-2. Open the job URL from SOLR
-3. Extract missing fields (salary, tags, cif, etc.)
-4. Use targetare.ro to find company CIF if needed
-5. **Use atomic update** with `{"set": "value"}` to preserve existing fields
-6. Push atomic update with all verified fields and status="verified"
-7. **Verify the update** by querying SOLR to confirm all fields
-8. If job is no longer available, delete it from SOLR
+## 6. Verification Workflow (from peviitor.ro first page)
+
+### Step 1: Get Jobs from API
+```bash
+curl -s "https://api.peviitor.ro/v1/search/?page=1"
+```
+This returns the first page of jobs with their URLs.
+
+### Step 2: Check Each Job URL
+For each job URL:
+1. Open the URL in Chrome using Chrome DevTools (`chrome-devtools_navigate_page`)
+2. Take a snapshot to see the content
+3. Determine if it's a **real job** or **NOT a job**:
+   - **NOT a job** (delete): Employee testimonials, company culture pages, "Meet our team" pages
+   - **Real job**: Has job title, responsibilities, requirements, apply button/form
+
+### Step 3: For Real Jobs - Extract Data
+From the job page, extract:
+- **company**: Company name visible on page
+- **cif**: Search web for "COMPANY NAME CIF Romania" if not on page
+- **salary**: "MIN-MAX RON" format (convert "lei" to "RON")
+- **workmode**: "remote", "on-site", or "hybrid"
+- **tags** (max 10): Include experience level (entry/mid/senior), skills, industry
+
+### Step 4: Update Company Core
+If company is new or needs updating:
+```bash
+curl -u solr:SolrRocks -X POST -H "Content-Type: application/json" \
+  "https://solr.peviitor.ro/solr/company/update?commit=true" \
+  -d "{\"add\": {\"doc\": {\"id\": \"<CIF>\", \
+  \"company\": {\"set\": \"<company_name>\"}, \
+  \"brand\": {\"set\": \"<brand>\"}, \
+  \"website\": {\"set\": [\"<website>\"]}, \
+  \"career\": {\"set\": [\"<career_page>\"]}, \
+  \"lastScraped\": {\"set\": \"2026-03-09T00:00:00Z\"}}}}"
+```
+
+### Step 5: Push Job Update
+Use atomic update with today's date:
+```bash
+curl -u solr:SolrRocks -X POST -H "Content-Type: application/json" \
+  "https://solr.peviitor.ro/solr/job/update?commit=true" \
+  -d "{\"add\": {\"doc\": {\"url\": \"<JOB_URL>\", \
+  \"company\": {\"set\": \"<company>\"}, \
+  \"cif\": {\"set\": \"<cif>\"}, \
+  \"salary\": {\"set\": \"<salary>\"}, \
+  \"workmode\": {\"set\": \"<workmode>\"}, \
+  \"tags\": {\"set\": [\"tag1\", \"tag2\"]}, \
+  \"status\": {\"set\": \"verified\"}, \
+  \"vdate\": {\"set\": \"2026-03-09T00:00:00Z\"}}}}"
+```
+
+### Step 6: Verify the Update
+```bash
+curl -u solr:SolrRocks "https://solr.peviitor.ro/solr/job/select?q=url:<JOB_URL>&wt=json"
+```
+
+### Step 7: Delete Non-Job Pages
+If URL is not a real job:
+```bash
+curl -u solr:SolrRocks -X POST -H "Content-Type: application/json" \
+  "https://solr.peviitor.ro/solr/job/update?commit=true" \
+  -d "{\"delete\": [\"<JOB_URL>\"]}"
+```
+
+## 7. OLX Jobs
+See [OLX.md](./OLX.md) for how to verify and scrape OLX jobs using their official API.
