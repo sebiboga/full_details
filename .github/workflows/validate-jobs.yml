@@ -1,4 +1,4 @@
-name: Validate Jobs from Solr
+name: Validate scraped Jobs from Solr
 
 on:
   schedule:
@@ -7,7 +7,7 @@ on:
 
 
 jobs:
-  validate-jobs:
+  validate-scraped-jobs:
     runs-on: ubuntu-latest
 
     steps:
